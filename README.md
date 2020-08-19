@@ -5,6 +5,11 @@ ODNPLab: One-Step ODNP Processing
 http://odnplab.com/
 
 # Log
+### v1.2
+* Faster processing time
+* Hidden advanced configs
+* Included options to drop corrupted data points
+
 ### v1.0
 * Optimized integration center automatically. 
 * Included customized T1,0(0) as input.
