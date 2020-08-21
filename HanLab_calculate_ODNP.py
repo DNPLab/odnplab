@@ -1,4 +1,6 @@
-"""ODNP Analysis for rb_dnp1 command at CNSI"""
+"""
+ODNP Analysis for rb_dnp1 command at CNSI
+"""
 ### DO NOT EDIT
 import datetime
 import os
