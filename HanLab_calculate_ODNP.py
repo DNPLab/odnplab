@@ -116,8 +116,13 @@ def get_powers(directory,powerfile,ExpNums,bufferVal):
                 cutPower.append(power[k])
         powers = round(np.average(cutPower), 3)
         power_List.append(float(powers))
-        
-    return power_List
+
+    Epowers = np.add(power_List, 21.9992)
+    Epowers = np.divide(Epowers, 10)
+    Epowers = np.power(10, Epowers)
+    Epowers = np.multiply(1e-3, Epowers)
+
+    return Epowers
 
 
 def find_peak(f, xmin, xmax):
@@ -221,28 +226,14 @@ def hanlab_calculate_odnp(directory:str, pars:dict, verbose=True):
 
     # get powers from .mat files
     # for E(p)
-    powerfile = 'power'
-    bufferVal = 2.5
-    ExpNums = folders_Enhancements
-    ## SEPARATE FUNCTION ##
-    Epowers = get_powers(directory,powerfile,ExpNums,bufferVal)
-
-    Epowers = np.add(Epowers, 21.9992)
-    Epowers = np.divide(Epowers, 10)
-    Epowers = np.power(10, Epowers)
-    Epowers = np.multiply(1e-3, Epowers)
-
+    Epowers = get_powers(
+        directory, powerfile='power',
+        ExpNums=folders_Enhancements, bufferVal=2.5
+    )
     # for T1(p)
-    powerfile = 't1_powers'
-    bufferVal = 20 * 2.5
-    ExpNums = folders_T1s
-    ## SEPARATE FUNCTION ##
-    T1powers = get_powers(directory,powerfile,ExpNums,bufferVal)
-
-    T1powers = np.add(T1powers, 21.9992)
-    T1powers = np.divide(T1powers, 10)
-    T1powers = np.power(10, T1powers)
-    T1powers = np.multiply(1e-3, T1powers)
+    T1powers = get_powers(
+        directory, powerfile='t1_powers', ExpNums=folders_T1s, bufferVal=20 * 2.5
+    )
 
     # Filter corrupted data points
     Epowers = Epowers.tolist()
