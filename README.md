@@ -5,6 +5,11 @@ ODNPLab: One-Step ODNP Processing
 http://odnplab.com/
 
 # Log
+### v1.3
+* Added plots of k_sigma(p) with text of key hydration results
+* Added lines of fit
+* Aligned color and font with DNPLab
+
 ### v1.2
 * Faster processing time
 * Hidden advanced configs
