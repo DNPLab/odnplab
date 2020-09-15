@@ -8,7 +8,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from HanLab_calculate_ODNP import hanlab_calculate_odnp
 from dnplab.dnpHydration import HydrationParameter
-from app_helper import ProcParameter, dict_to_str, get_table_download_link
+from app_helper import ProcParameter, dict_to_str, get_table_download_link, \
+    fake_results
 
 st.set_option('deprecation.showfileUploaderEncoding', False)
 
@@ -76,6 +77,7 @@ def run(uploaded_file, ppar:ProcParameter, hpar:HydrationParameter):
     # print(f"But I am in a demo mode and not going to run it actually")
 
     with tempfile.TemporaryDirectory(dir=TEMPDIR) as tmpdir:
+        print(uploaded_file)
 
         # upzip to tmpdir
         with zipfile.ZipFile(uploaded_file, "r") as zip_ref:
@@ -104,22 +106,25 @@ def run(uploaded_file, ppar:ProcParameter, hpar:HydrationParameter):
              'drop_e_powers'       : ppar['drop_e_powers'],
              'drop_t1_powers'      : ppar['drop_t1_powers']
         }  # TODO: creating a dictionary is error-prone, replace it with a parameter class
-        hresults = hanlab_calculate_odnp(path, pars, verbose=ppar.verbose)
-        # Check T1,0 vs T1,0,0
-        t10, t10std, t100 = hresults['T10'], hresults['T10_std'], hpar.T100
-        if t10 + t10std > t100:
-            st.warning(
-                r"Error: $T_{1,0,0}$ must no less than T_{1,0} + stdev(T_{1,0}) \n"+
-                r"$T_{1,0,0}, T_{1,0}, stdev(T_{1,0}) = "+
-                rf"{round(t100,2)}, {round(t10,2)}, {round(t10std,2)}$")
-            return {}, '', {}
-        mydict = {k: v for k, v in hresults.items()
-                  if type(v) != type(np.ndarray([]))}
-        mydict.update({k: ', '.join([f"{vi:.4f}" for vi in v])
-                       for k, v in hresults.items()
-                       if type(v) == type(np.ndarray([]))})
+        # hresults = hanlab_calculate_odnp(path, pars, verbose=ppar.verbose)
+        # hresults = fake_results()
+    return {}, '', {}
 
-    return mydict, expname, hresults
+    #     # Check T1,0 vs T1,0,0
+    #     t10, t10std, t100 = hresults['T10'], hresults['T10_std'], hpar.T100
+    #     if t10 + t10std > t100:
+    #         st.warning(
+    #             r"Error: $T_{1,0,0}$ must no less than T_{1,0} + stdev(T_{1,0}) \n"+
+    #             r"$T_{1,0,0}, T_{1,0}, stdev(T_{1,0}) = "+
+    #             rf"{round(t100,2)}, {round(t10,2)}, {round(t10std,2)}$")
+    #         return {}, '', {}
+    #     mydict = {k: v for k, v in hresults.items()
+    #               if type(v) != type(np.ndarray([]))}
+    #     mydict.update({k: ', '.join([f"{vi:.4f}" for vi in v])
+    #                    for k, v in hresults.items()
+    #                    if type(v) == type(np.ndarray([]))})
+    #
+    # return mydict, expname, hresults
 
 
 def plot(data:dict):
@@ -246,7 +251,8 @@ st.title(f'ODNPLab: One-Step ODNP Processing \n {VERSION} \t Powered by [DNPLab]
 st.markdown("## Upload a Zip file")
 uploaded_file = st.file_uploader("Here ->", type="zip")
 
-if uploaded_file is not None:
+# if uploaded_file is not None:
+if True:
 
     # Parameters
     ss.ppar.verbose = False
