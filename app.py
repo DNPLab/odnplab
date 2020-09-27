@@ -1,3 +1,5 @@
+import builtins
+
 import streamlit as st
 import SessionState as stss
 import zipfile
@@ -6,8 +8,9 @@ import pprint
 import os
 import numpy as np
 import matplotlib.pyplot as plt
-from HanLab_calculate_ODNP import hanlab_calculate_odnp
 from dnplab.dnpHydration import HydrationParameter
+
+from HanLab_calculate_ODNP import import_and_intergrate, calculate_hydration
 from app_helper import ProcParameter, dict_to_str, get_table_download_link
 
 st.set_option('deprecation.showfileUploaderEncoding', False)
@@ -72,9 +75,44 @@ def run(uploaded_file, ppar:ProcParameter, hpar:HydrationParameter):
         hresults: dictionary of hydration results
 
     """
-    # print(f"You just upload this file -> {uploaded_file}")
-    # print(f"But I am in a demo mode and not going to run it actually")
+    par_dict = {
+        'integration_width': ppar.eiw,
+        'spin_C': hpar.spin_C,
+        'field': hpar.field,
+        'T100': hpar.T100,
+        'smax_model': hpar.smax_model,
+        't1_interp_method': hpar.t1_interp_method,
+        'drop_e_powers': ppar['drop_e_powers'],
+        'drop_t1_powers': ppar['drop_t1_powers']
+    }
+    expname, results = cached_run(uploaded_file, par_dict, ppar.verbose)
+    Enhancements, Enhancement_powers, T1p, T1_powers, T10, T1_stdd, T10_stdd = results
+    hresults = calculate_hydration(Enhancements, Enhancement_powers, T1p,
+                                  T1_powers, T10, hpar)
+    hresults.update(
+        {
+            "T1_std": np.array(T1_stdd),
+            "T10_std": T10_stdd,
+        }
+    )
+    # Check T1,0 vs T1,0,0
+    t10, t10std, t100 = hresults['T10'], hresults['T10_std'], par_dict['T100']
+    if t10 + t10std > t100:
+        st.warning(
+            r"Error: $T_{1,0,0}$ must no less than T_{1,0} + stdev(T_{1,0}) \n" +
+            r"$T_{1,0,0}, T_{1,0}, stdev(T_{1,0}) = " +
+            rf"{round(t100, 2)}, {round(t10, 2)}, {round(t10std, 2)}$")
+        return {}, '', {}
+    mydict = {k: v for k, v in hresults.items()
+              if type(v) != type(np.ndarray([]))}
+    mydict.update({k: ', '.join([f"{vi:.4f}" for vi in v])
+                   for k, v in hresults.items()
+                   if type(v) == type(np.ndarray([]))})
+    return mydict, expname, hresults
 
+
+@st.cache(hash_funcs={builtins.complex: lambda _: None})
+def cached_run(uploaded_file, par_dict:dict, verbose:bool):
     with tempfile.TemporaryDirectory(dir=TEMPDIR) as tmpdir:
 
         # upzip to tmpdir
@@ -92,34 +130,9 @@ def run(uploaded_file, ppar:ProcParameter, hpar:HydrationParameter):
             else:
                 expname = expname[0][0:-2]
 
-        # Process CNSI ODNP and return a str of results
-        path = os.path.join(tmpdir, expname)  # path to CNSI data folder
-        pars = {
-            'integration_width'  : ppar.eiw,
-             'spin_C'             : hpar.spin_C,
-             'field'              : hpar.field,
-             'T100'               : hpar.T100,
-             'smax_model'         : hpar.smax_model,
-             't1_interp_method'   : hpar.t1_interp_method,
-             'drop_e_powers'       : ppar['drop_e_powers'],
-             'drop_t1_powers'      : ppar['drop_t1_powers']
-        }  # TODO: creating a dictionary is error-prone, replace it with a parameter class
-        hresults = hanlab_calculate_odnp(path, pars, verbose=ppar.verbose)
-        # Check T1,0 vs T1,0,0
-        t10, t10std, t100 = hresults['T10'], hresults['T10_std'], hpar.T100
-        if t10 + t10std > t100:
-            st.warning(
-                r"Error: $T_{1,0,0}$ must no less than T_{1,0} + stdev(T_{1,0}) \n"+
-                r"$T_{1,0,0}, T_{1,0}, stdev(T_{1,0}) = "+
-                rf"{round(t100,2)}, {round(t10,2)}, {round(t10std,2)}$")
-            return {}, '', {}
-        mydict = {k: v for k, v in hresults.items()
-                  if type(v) != type(np.ndarray([]))}
-        mydict.update({k: ', '.join([f"{vi:.4f}" for vi in v])
-                       for k, v in hresults.items()
-                       if type(v) == type(np.ndarray([]))})
-
-    return mydict, expname, hresults
+        # Process CNSI ODNP
+        path = os.path.join(tmpdir, expname)
+        return expname, import_and_intergrate(path, par_dict, verbose)
 
 
 def plot(data:dict):

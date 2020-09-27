@@ -194,24 +194,10 @@ def test_find_peak():
     assert find_peak(lambda x: x ** 2, -1, 1) == (-1, 1)
 
 
-def hanlab_calculate_odnp(directory: str, pars: dict, verbose=True):
+def import_and_intergrate(directory: str, pars: dict, verbose=True):
     """
-    Args:
-        directory: A string of the odnp experiment folder. e.g. '../data/topspin/'
-        pars: A dictionary of the processing parameters (including integration width etc)
-            Attr:
-                ({integration_width  : int,   # set the default starting point to 20
-                  spin_C             : float,
-                  field              : float,
-                  T100               : float,
-                  smax_model         : str,   # ('tethered' or 'free')
-                  t1_interp_method   : str    # ('linear' or 'second_order'),
-                  drop_e_powers       : list   # a list of Enhancement powers to drop
-                  drop_t1_powers     : list   # a list of T1 powers to drop
-                })
-        verbose: whether print intermediate outputs or not
     Returns:
-        HydrationResults: A dnplab.hydration.HydrationResults object.
+        Tuple(np.array, np.array, np.array, np.array)
     """
 
     # folder number for p=0 point in ODNP set
@@ -256,23 +242,23 @@ def hanlab_calculate_odnp(directory: str, pars: dict, verbose=True):
     T1powers = T1powers.tolist()
     if "drop_e_powers" in pars.keys():
         print("Dropping corrupted E(p) data ...") if verbose else None
-        E_indexs = [
-            i
-            for i, x in enumerate(Epowers)
-            if any([abs(x - y) < 1e-6 for y in pars["drop_e_powers"]])
-        ]
+        E_indexs = []
+        # Avoid list comprehension for streamlit.cache
+        for i, x in enumerate(Epowers):
+            if any([abs(x - y) < 1e-6 for y in pars["drop_e_powers"]]):
+                E_indexs.append(i)
         [Epowers.pop(i) and folders_Enhancements.pop(i) for i in E_indexs]
     if "drop_t1_powers" in pars.keys():
         print("Dropping corrupted T1(p) data ...") if verbose else None
-        T1_indexs = [
-            i
-            for i, x in enumerate(T1powers)
-            if any([abs(x - y) < 1e-6 for y in pars["drop_t1_powers"]])
-        ]
+        T1_indexs = []
+        for i, x in enumerate(T1powers):
+            if any([abs(x - y) < 1e-6 for y in pars["drop_t1_powers"]]):
+                T1_indexs.append(i)
         [T1powers.pop(i) and folders_T1s.pop(i) for i in T1_indexs]
 
     total_folders = (
-        [folder_p0] + list(folders_Enhancements) + list(folders_T1s) + [folder_T10]
+            [folder_p0] + list(folders_Enhancements) + list(folders_T1s) + [
+        folder_T10]
     )
 
     T1 = []
@@ -321,7 +307,8 @@ def hanlab_calculate_odnp(directory: str, pars: dict, verbose=True):
 
         workspace = dnplab.dnpNMR.integrate(
             workspace,
-            {"integrate_center": center, "integrate_width": pars["integration_width"]},
+            {"integrate_center": center,
+             "integrate_width": pars["integration_width"]},
         )
 
         if folder == folder_p0:
@@ -336,7 +323,8 @@ def hanlab_calculate_odnp(directory: str, pars: dict, verbose=True):
             workspace = dnplab.dnpFit.t1Fit(workspace)
             T1.append(workspace["fit"].attrs["t1"])
             T1_stdd.append(workspace["fit"].attrs["t1_stdd"])
-            print("Done with T1(p) folder " + str(folder) + "...") if verbose else None
+            print("Done with T1(p) folder " + str(
+                folder) + "...") if verbose else None
         elif folder in folders_Enhancements:
             E.append(np.real(workspace["proc"].values[0]) / p0)
             print(
@@ -362,6 +350,13 @@ def hanlab_calculate_odnp(directory: str, pars: dict, verbose=True):
     T1p = T1[:, 1]
     T1_stdd = T1[:, 2]
 
+    return Enhancements, Enhancement_powers, T1p, T1_powers, T10, T1_stdd, T10_stdd
+
+
+def calculate_hydration(Enhancements, Enhancement_powers, T1p, T1_powers, T10, pars):
+    """
+    Return a list of hydration results
+    """
     hydration = {
         "E": np.array(Enhancements),
         "E_power": np.array(Enhancement_powers),
@@ -384,15 +379,45 @@ def hanlab_calculate_odnp(directory: str, pars: dict, verbose=True):
         {
             "E": np.array(Enhancements),
             "E_power": np.array(Enhancement_powers),
-            "T1_std": np.array(T1_stdd),
             "T1": np.array(T1p),
             "T1_power": np.array(T1_powers),
             "T10": T10,
-            "T10_std": T10_stdd,
         }
     )
 
     return hydration_results
+
+
+def hanlab_calculate_odnp(directory: str, pars: dict, verbose=True):
+    """
+    Args:
+        directory: A string of the odnp experiment folder. e.g. '../data/topspin/'
+        pars: A dictionary of the processing parameters (including integration width etc)
+            Attr:
+                ({integration_width  : int,   # set the default starting point to 20
+                  spin_C             : float,
+                  field              : float,
+                  T100               : float,
+                  smax_model         : str,   # ('tethered' or 'free')
+                  t1_interp_method   : str    # ('linear' or 'second_order'),
+                  drop_e_powers       : list   # a list of Enhancement powers to drop
+                  drop_t1_powers     : list   # a list of T1 powers to drop
+                })
+        verbose: whether print intermediate outputs or not
+    Returns:
+        HydrationResults: A dnplab.hydration.HydrationResults object.
+    """
+    Enhancements, Enhancement_powers, T1p, T1_powers, T10, T1_stdd, T10_stdd = import_and_intergrate(
+        directory, pars, verbose)
+    results = calculate_hydration(Enhancements, Enhancement_powers, T1p,
+                                  T1_powers, T10)
+    results.update(
+        {
+            "T1_std": np.array(T1_stdd),
+            "T10_std": T10_stdd,
+        }
+    )
+    return results
 
 
 if __name__ == "__main__":
