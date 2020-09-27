@@ -1,0 +1,5 @@
+streamlit
+black
+numpy
+scipy
+dnplab
