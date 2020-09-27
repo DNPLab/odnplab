@@ -1,6 +1,6 @@
 import base64
 
-from dnpLab.dnpHydration import Parameter
+from dnplab.dnpHydration import Parameter
 
 
 class ProcParameter(Parameter):
